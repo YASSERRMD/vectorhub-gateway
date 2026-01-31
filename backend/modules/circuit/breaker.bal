@@ -16,7 +16,7 @@ public class CircuitBreaker {
     int failureCount = 0;
     int successCount = 0;
     int totalRequests = 0;
-    decimal lastFailureTime = 0;
+    time:Utc lastFailureTime = time:utcNow();
     
     public function init(string name, config:CircuitBreakerConfig config) {
         self.name = name;
@@ -25,8 +25,10 @@ public class CircuitBreaker {
 
     public function allowRequest() returns boolean {
         if (self.state == OPEN) {
-            decimal currentTime = time:utcToDecimal(time:utcNow());
-            if ((currentTime - self.lastFailureTime) * 1000d > <decimal>self.config.resetTimeMs) {
+            time:Utc currentTime = time:utcNow();
+            decimal diff = time:utcDiffSeconds(currentTime, self.lastFailureTime);
+            
+            if (diff * 1000d > <decimal>self.config.resetTimeMs) {
                 self.state = HALF_OPEN;
                 utils:info("Circuit breaker " + self.name + " switched to HALF_OPEN");
                 return true;
@@ -52,7 +54,7 @@ public class CircuitBreaker {
     }
 
     public function recordFailure() {
-        self.lastFailureTime = time:utcToDecimal(time:utcNow());
+        self.lastFailureTime = time:utcNow();
         
         if (self.state == HALF_OPEN) {
             self.state = OPEN;
