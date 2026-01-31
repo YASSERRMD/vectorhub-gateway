@@ -1,0 +1,120 @@
+import ballerina/http;
+import vectorhub/gateway.config;
+import vectorhub/gateway.utils;
+import vectorhub/gateway.cache;
+import vectorhub/gateway.pool;
+import vectorhub/gateway.gateway;
+
+// Global configuration
+config:AppConfig appConfig = checkpanic config:loadConfig("Config.toml");
+
+// Initialize Redis Cache
+cache:RedisCache redisCache = new();
+error? cacheInit = redisCache.init(appConfig.gateway.routing.strategy == "latency" ? "" : "redis://localhost:6379"); // TODO: Add redis config to toml properly
+// For now assuming localhost:6379 or disabled if string is empty.
+// Actually, let's use a hardcoded value or add to config later. 
+// Using "redis://localhost:6379" for now.
+error? rInit = redisCache.init("redis://localhost:6379");
+if rInit is error {
+    utils:logError("Failed to initialize Redis", rInit);
+}
+
+// Initialize Connection Pool
+pool:ConnectionPool connPool = new();
+checkpanic connPool.init(appConfig);
+
+// Initialize Gateway Components
+gateway:Router router = new();
+router.init(connPool, appConfig);
+
+gateway:Aggregator aggregator = new();
+
+gateway:Deduplicator deduplicator = new();
+deduplicator.init(redisCache);
+
+gateway:RateLimiter rateLimiter = new();
+rateLimiter.init(redisCache, 100, 60);
+
+service http:Service / on new http:Listener(appConfig.gateway.port) {
+
+    resource function get health() returns json {
+        return {
+            "status": "ok",
+            "backend_status": connPool.checkHealth()
+        };
+    }
+
+    resource function post v1/search(http:Request req) returns json|error {
+        json|error payload = req.getJsonPayload();
+        if payload is error {
+            return { "error": "Invalid JSON payload" };
+        }
+
+        // 1. Rate Limiting (Simple IP check - skipping IP extraction complexity for now, using "default")
+        // In real app, extract IP from req.remoteAddress or X-Forwarded-For
+        if !rateLimiter.isAllowed("default") {
+            http:Response resp = new;
+            resp.statusCode = 429;
+            resp.setPayload({ "error": "Rate limit exceeded" });
+            return resp;
+        }
+
+        string collection = (check payload.collection).toString();
+        // Handle vector extraction. Assuming simple list of floats for now.
+        // Json parsing to float[] can be tricky if not defined in type. 
+        // For simplicity, we accept it as json and pass to clients which handle their own types.
+        // We need extraction for deduplication key.
+        
+        // 2. Deduplication Check
+        string dedupKey = deduplicator.generateKey(collection, payload);
+        string? cached = deduplicator.getCachedResult(dedupKey);
+        if cached is string {
+             return cached.fromJsonString();
+        }
+
+        // 3. Routing
+        string[] backends = router.selectBackends();
+        if backends.length() == 0 {
+             return { "error": "No available backends" };
+        }
+
+        // 4. Parallel Execution
+        map<http:Response|error> responses = {};
+        
+        // Extract vector and topK safely
+        // Assuming payload structure: { "collection": "name", "vector": [0.1, ...], "topK": 10 }
+        json vectorJson = check payload.vector;
+        float[] vector = check vectorJson.cloneWithType();
+        int topK = (check payload.topK).toString() == "null" ? 5 : check int:fromString((check payload.topK).toString());
+
+        foreach string backend in backends {
+            if backend == "qdrant" {
+                responses["qdrant"] = connPool.getQdrantClient().search(collection, vector, topK);
+            } else if backend == "milvus" {
+                 responses["milvus"] = connPool.getMilvusClient().search(collection, vector, topK);
+            } else if backend == "weaviate" {
+                 responses["weaviate"] = connPool.getWeaviateClient().search(collection, vector, topK);
+            }
+        }
+
+        // 5. Aggregation
+        json|error aggregated = aggregator.aggregate(responses);
+        
+        if aggregated is json {
+             // 6. Cache Result
+             deduplicator.cacheResult(dedupKey, aggregated.toJsonString(), 60); // 60s cache
+             return aggregated;
+        } else {
+             utils:logError("Aggregation failed", aggregated);
+             return { "error": "Search failed" };
+        }
+    }
+}
+
+public function main() returns error? {
+    utils:info("Starting VectorHub Gateway on port " + appConfig.gateway.port.toString());
+    
+    // Keep main running if needed, though service listeners keep it alive usually.
+    runtime:sleep(0.1);
+}
+

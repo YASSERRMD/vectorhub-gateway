@@ -8,37 +8,28 @@ import vectorhub/gateway.gateway;
 // Global configuration
 config:AppConfig appConfig = checkpanic config:loadConfig("Config.toml");
 
-// Initialize Redis Cache
-cache:RedisCache redisCache = new();
-error? cacheInit = redisCache.init(appConfig.gateway.routing.strategy == "latency" ? "" : "redis://localhost:6379"); // TODO: Add redis config to toml properly
-// For now assuming localhost:6379 or disabled if string is empty.
-// Actually, let's use a hardcoded value or add to config later. 
-// Using "redis://localhost:6379" for now.
-error? rInit = redisCache.init("redis://localhost:6379");
-if rInit is error {
-    utils:logError("Failed to initialize Redis", rInit);
-}
+// Initialize modules using checkpanic for top-level error handling
+// Ideally we would wrap this in a start-up function, but top-level vars work for this scale.
 
-// Initialize Connection Pool
-pool:ConnectionPool connPool = new();
-checkpanic connPool.init(appConfig);
+// 1. Config & Utils (already loaded)
 
-// Initialize Gateway Components
-gateway:Router router = new();
-router.init(connPool, appConfig);
+// 2. Cache
+// TODO: Load redis URL from config properly
+cache:RedisCache redisCache = checkpanic new("redis://localhost:6379");
 
+// 3. Connection Pool
+pool:ConnectionPool connPool = checkpanic new(appConfig);
+
+// 4. Gateway Components
+gateway:Router router = new(connPool, appConfig);
 gateway:Aggregator aggregator = new();
-
-gateway:Deduplicator deduplicator = new();
-deduplicator.init(redisCache);
-
-gateway:RateLimiter rateLimiter = new();
-rateLimiter.init(redisCache, 100, 60);
+gateway:Deduplicator deduplicator = new(redisCache);
+gateway:RateLimiter rateLimiter = new(redisCache, 100, 60); // Default limits
 
 service http:Service / on new http:Listener(appConfig.gateway.port) {
 
     resource function get health() returns json {
-        return {
+         return {
             "status": "ok",
             "backend_status": connPool.checkHealth()
         };
@@ -47,12 +38,82 @@ service http:Service / on new http:Listener(appConfig.gateway.port) {
     resource function get v1/ping() returns string {
          return "pong";
     }
-}
 
-public function main() returns error? {
-    utils:info("Starting VectorHub Gateway on port " + appConfig.gateway.port.toString());
-    
-    // Keep main running if needed, though service listeners keep it alive usually.
-    runtime:sleep(0.1);
-}
+    resource function post v1/search(http:Request req) returns http:Response|json|error {
+        json|error payload = req.getJsonPayload();
+        if payload is error {
+            return { "error": "Invalid JSON payload" };
+        }
 
+        // 1. Rate Limiting
+        // TODO: Extract real IP
+        if !rateLimiter.isAllowed("default_ip") {
+            http:Response resp = new;
+            resp.statusCode = 429;
+            resp.setPayload({ "error": "Rate limit exceeded" });
+            return resp; // Return Response object directly
+        }
+
+        // Validate payload fields exists
+        json|error collectionJson = payload.collection;
+        if collectionJson is error {
+             return { "error": "Missing 'collection' field" };
+        }
+        string collection = collectionJson.toString();
+
+        json|error vectorJson = payload.vector;
+        if vectorJson is error {
+             return { "error": "Missing 'vector' field" };
+        }
+        
+        // 2. Deduplication
+        string dedupKey = deduplicator.generateKey(collection, payload);
+        string? cached = deduplicator.getCachedResult(dedupKey);
+        if cached is string {
+             return cached.fromJsonString();
+        }
+
+        // 3. Routing
+        string[] backends = router.selectBackends();
+        if backends.length() == 0 {
+             return { "error": "No available backends" };
+        }
+
+        // 4. Parallel Execution
+        // Extract vector and topK
+        float[] vector = check vectorJson.cloneWithType();
+        
+        json|error topKJson = payload.topK;
+        int topK = 5;
+        if topKJson is int {
+            topK = topKJson;
+        } else if topKJson is string { // Handle string numbers if necessary
+            int|error t = int:fromString(topKJson);
+            if t is int { topK = t; }
+        }
+
+        map<http:Response|error> responses = {};
+        
+        foreach string backend in backends {
+            if backend == "qdrant" {
+                responses["qdrant"] = connPool.getQdrantClient().search(collection, vector, topK);
+            } else if backend == "milvus" {
+                 responses["milvus"] = connPool.getMilvusClient().search(collection, vector, topK);
+            } else if backend == "weaviate" {
+                 responses["weaviate"] = connPool.getWeaviateClient().search(collection, vector, topK);
+            }
+        }
+
+        // 5. Aggregation
+        json|error aggregated = aggregator.aggregate(responses);
+        
+        if aggregated is json {
+             // 6. Cache Result
+             deduplicator.cacheResult(dedupKey, aggregated.toJsonString(), 60); 
+             return aggregated;
+        } else {
+             utils:logError("Aggregation failed", aggregated);
+             return { "error": "Search failed" };
+        }
+    }
+}
