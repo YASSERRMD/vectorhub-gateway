@@ -2,7 +2,7 @@
 org = "vectorhub"
 name = "gateway"
 version = "0.1.0"
-distribution = "2201.8.0"
+distribution = "2201.13.1"
 
 [build-options]
 observabilityIncluded = true
@@ -29,5 +29,11 @@ version = "1.8.0"
 
 [[dependency]]
 org = "ballerina"
-name = "io"
+name = "toml"
 version = "1.7.0"
+
+
+[[dependency]]
+org = "ballerina"
+name = "toml"
+version = "0.8.0"

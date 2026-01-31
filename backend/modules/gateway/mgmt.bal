@@ -1,4 +1,4 @@
-import ballerina/http;
+// import ballerina/http;
 import vectorhub/gateway.pool;
 import vectorhub/gateway.cache;
 
