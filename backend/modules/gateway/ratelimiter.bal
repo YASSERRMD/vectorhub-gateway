@@ -3,12 +3,12 @@ import vectorhub/gateway.utils;
 
 public class RateLimiter {
     cache:RedisCache? cache;
-    int limit;
+    int requestLimits;
     int windowSeconds;
 
-    public function init(cache:RedisCache? cache, int requestLimit = 100, int window = 60) {
+    public function init(cache:RedisCache? cache, int reqLimit = 100, int window = 60) {
         self.cache = cache;
-        self.limit = requestLimit;
+        self.requestLimits = reqLimit;
         self.windowSeconds = window;
     }
 
@@ -19,7 +19,7 @@ public class RateLimiter {
             int|error count = rCache.increment(key, self.windowSeconds);
             
             if count is int {
-                if count > self.limit {
+                if count > self.requestLimits {
                     utils:warn("Rate limit exceeded for IP: " + clientIp);
                     return false;
                 }
