@@ -1,9 +1,15 @@
 FROM ballerina/ballerina:latest
 
-WORKDIR /home/ballerina/app
-# Copy JAR from local build (ensure 'bal build' was run locally)
-COPY target/bin/gateway.jar /home/ballerina/app/gateway.jar
-COPY Config.toml /home/ballerina/app/Config.toml
+WORKDIR /opt/gateway
+
+# Copy JAR
+COPY target/bin/gateway.jar /opt/gateway/gateway.jar
+
+# Copy empty Config.toml for Ballerina runtime
+COPY Config.toml /opt/gateway/Config.toml
+
+# Copy actual gateway configuration
+COPY gateway-config.toml /opt/gateway/gateway-config.toml
 
 EXPOSE 8080
 
