@@ -7,8 +7,15 @@ public client class QdrantClient {
 
     public function init(string url) returns error? {
         self.baseUrl = url;
-        self.httpClient = check new (url);
-        utils:info("Qdrant client initialized for: " + url);
+        if (url == "") {
+             // Allow empty for delayed init or error? For now, if empty, don't init http client yet or handle.
+             // But check new(url) requires valid url. 
+             // Using "http://localhost" as dummy if empty to prevent crash, assuming config validation handles it.
+             self.httpClient = check new ("http://localhost"); 
+        } else {
+             self.httpClient = check new (url);
+             utils:info("Qdrant client initialized for: " + url);
+        }
     }
 
     public function health() returns boolean {

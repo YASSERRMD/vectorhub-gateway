@@ -7,8 +7,12 @@ public client class WeaviateClient {
 
     public function init(string url) returns error? {
         self.baseUrl = url;
-        self.httpClient = check new (url);
-        utils:info("Weaviate client initialized for: " + url);
+        if (url == "") {
+             self.httpClient = check new ("http://localhost"); 
+        } else {
+             self.httpClient = check new (url);
+             utils:info("Weaviate client initialized for: " + url);
+        }
     }
 
     public function health() returns boolean {

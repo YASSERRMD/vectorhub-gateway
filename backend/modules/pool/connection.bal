@@ -11,22 +11,18 @@ public class ConnectionPool {
 
     public function init(config:AppConfig config) returns error? {
         self.appConfig = config;
-        self.qdrantClient = check new;
-        self.milvusClient = check new;
-        self.weaviateClient = check new;
+
+        // Initialize with first URL if available, else empty (or handle error)
+        // In real pool, we might manage list. For now, 1:1 mapping.
         
-        // Initialize Clients using the first URL for now (Load Balancing is Phase 4)
-        if (config.backends.qdrant.urls.length() > 0) {
-             check self.qdrantClient.init(config.backends.qdrant.urls[0]);
-        }
-        
-        if (config.backends.milvus.urls.length() > 0) {
-             check self.milvusClient.init(config.backends.milvus.urls[0]);
-        }
-        
-        if (config.backends.weaviate.urls.length() > 0) {
-             check self.weaviateClient.init(config.backends.weaviate.urls[0]);
-        }
+        string qdrantUrl = config.backends.qdrant.urls.length() > 0 ? config.backends.qdrant.urls[0] : "";
+        string milvusUrl = config.backends.milvus.urls.length() > 0 ? config.backends.milvus.urls[0] : "";
+        string weaviateUrl = config.backends.weaviate.urls.length() > 0 ? config.backends.weaviate.urls[0] : "";
+
+        // Client init called at creation
+        self.qdrantClient = check new clients:QdrantClient(qdrantUrl);
+        self.milvusClient = check new clients:MilvusClient(milvusUrl);
+        self.weaviateClient = check new clients:WeaviateClient(weaviateUrl);
         
         utils:info("Connection pool initialized");
     }
