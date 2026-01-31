@@ -62,6 +62,33 @@ services:
     volumes:
       - weaviate-data:/var/lib/weaviate
 
+  gateway:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - qdrant
+      - milvus
+      - weaviate
+      - redis
+      - jaeger
+    environment:
+      - BAL_CONFIG_FILES=/home/ballerina/app/Config.toml
+    # Ensure network access is correct, using default network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080 # Browser-side access
+    depends_on:
+      - gateway
+
   redis:
     image: redis:alpine
     ports:
