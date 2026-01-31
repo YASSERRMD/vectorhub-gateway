@@ -1,5 +1,6 @@
 import ballerina/http;
 import ballerina/time;
+import ballerina/os;
 import vectorhub/gateway.config;
 import vectorhub/gateway.utils;
 import vectorhub/gateway.cache;
@@ -7,7 +8,7 @@ import vectorhub/gateway.pool;
 import vectorhub/gateway.gateway;
 
 // Global configuration
-config:AppConfig appConfig = checkpanic config:loadConfig("Config.toml");
+config:AppConfig appConfig = checkpanic config:loadConfig("gateway-config.toml");
 
 // Initialize modules using checkpanic for top-level error handling
 // Ideally we would wrap this in a start-up function, but top-level vars work for this scale.
@@ -16,7 +17,9 @@ config:AppConfig appConfig = checkpanic config:loadConfig("Config.toml");
 
 // 2. Cache
 // TODO: Load redis URL from config properly
-cache:RedisCache redisCache = checkpanic new("redis://localhost:6379");
+string redisHost = os:getEnv("REDIS_HOST");
+string resolvedRedisHost = redisHost == "" ? "localhost" : redisHost;
+cache:RedisCache redisCache = checkpanic new("redis://" + resolvedRedisHost + ":6379");
 
 // 3. Connection Pool
 pool:ConnectionPool connPool = checkpanic new(appConfig);
@@ -29,6 +32,16 @@ gateway:RateLimiter rateLimiter = new(redisCache, 100, 60); // Default limits
 gateway:MetricsService metricsService = new();
 gateway:MgmtService mgmtService = new(connPool, redisCache, metricsService, appConfig); 
 
+@http:ServiceConfig {
+    cors: {
+        allowOrigins: ["*"],
+        allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowHeaders: ["*"],
+        exposeHeaders: ["*"],
+        allowCredentials: false,
+        maxAge: 86400
+    }
+}
 service http:Service / on new http:Listener(appConfig.gateway.port) {
 
     resource function get health() returns json {

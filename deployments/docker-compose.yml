@@ -75,7 +75,10 @@ services:
       - redis
       - jaeger
     environment:
-      - BAL_CONFIG_FILES=/home/ballerina/app/Config.toml
+      - APP_CONF_PATH=Config.toml # Just in case we need env, but code uses literal "Config.toml" currently
+      - REDIS_HOST=redis
+    # BAL_CONFIG_FILES removed to prevent "unused configuration value" errors
+
     # Ensure network access is correct, using default network
 
   frontend:

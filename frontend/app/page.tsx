@@ -29,15 +29,16 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('/api/health-proxy'); // We'll need a proxy or direct access
-        // For local dev with docker, client-side to localhost:8080 works IF port mapped.
-        // If user says "nothing works", assume we need robust fetching.
-        // Let's rely on Next.js API route or just fetch directly if CORS allowed.
-        // For simplicity in this demo, accessing localhost:8080 from browser.
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-        const response = await fetch(`${apiUrl}/health`);
-        const json = await response.json();
+        // Try the Next.js API proxy first (server-side, no CORS issues)
+        let response = await fetch('/api/health-proxy');
 
+        // If proxy fails, try direct call (works when CORS is enabled)
+        if (!response.ok) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+          response = await fetch(`${apiUrl}/health`);
+        }
+
+        const json = await response.json();
         setData(json);
 
         setHistory(prev => {
@@ -56,7 +57,8 @@ export default function Dashboard() {
       }
     };
 
-    const interval = setInterval(fetchData, 1000); // Real-time updates
+    fetchData(); // Initial fetch immediately
+    const interval = setInterval(fetchData, 2000); // Reduced frequency
     return () => clearInterval(interval);
   }, []);
 
