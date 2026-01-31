@@ -25,7 +25,8 @@ export default function SearchPage() {
                 throw new Error('Invalid vector format. Must be a JSON array of numbers.');
             }
 
-            const res = await fetch('http://localhost:8080/v1/search', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+            const res = await fetch(`${apiUrl}/v1/search`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

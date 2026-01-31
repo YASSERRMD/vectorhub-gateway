@@ -1,79 +1,186 @@
-import HealthCard from '@/components/HealthCard';
+'use client';
 
-// Opt for dynamic rendering to get fresh status
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { Activity, Server, Zap, Globe, Database, Cpu } from 'lucide-react';
+import clsx from 'clsx';
+
+// Dynamic rendering for server components if mixed
 export const dynamic = 'force-dynamic';
 
-async function getHealth() {
-  try {
-    const res = await fetch('http://localhost:8080/health', { cache: 'no-store' });
-    if (!res.ok) {
-      throw new Error('Failed to fetch health');
-    }
-    return res.json();
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
+interface HealthData {
+  status: string;
+  backend_status: Record<string, string>;
+  metrics?: {
+    total_requests: number;
+    failed_requests: number;
+    successful_requests: number;
+    avg_latency_ms: number;
+    current_rps: number;
+  };
+  config?: any;
 }
 
-export default async function Home() {
-  const healthData = await getHealth();
-  const backendStatus = healthData?.backend_status || {};
+export default function Dashboard() {
+  const [data, setData] = useState<HealthData | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
-  // Mapping status to "up" | "down" | "unknown"
-  const getStatus = (s: string) => (s === 'UP' ? 'up' : 'down');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/api/health-proxy'); // We'll need a proxy or direct access
+        // For local dev with docker, client-side to localhost:8080 works IF port mapped.
+        // If user says "nothing works", assume we need robust fetching.
+        // Let's rely on Next.js API route or just fetch directly if CORS allowed.
+        // For simplicity in this demo, accessing localhost:8080 from browser.
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+        const response = await fetch(`${apiUrl}/health`);
+        const json = await response.json();
 
-  // Hardcoded latencies for now as backend health check might not return latency yet or different format
-  // Assuming backend returns { "qdrant": "UP", ... }
+        setData(json);
+
+        setHistory(prev => {
+          const newPoint = {
+            time: new Date().toLocaleTimeString(),
+            rps: json.metrics?.current_rps || 0,
+            latency: json.metrics?.avg_latency_ms || 0
+          };
+          const newHistory = [...prev, newPoint];
+          if (newHistory.length > 20) newHistory.shift();
+          return newHistory;
+        });
+
+      } catch (e) {
+        console.error("Fetch failed", e);
+      }
+    };
+
+    const interval = setInterval(fetchData, 1000); // Real-time updates
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!data) return <div className="flex h-screen items-center justify-center text-white">Loading Gateway...</div>;
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-          System Overview
-        </h2>
-        <p className="text-gray-400 mt-2">Real-time status of vector database backends.</p>
+    <div className="space-y-8 p-6">
+      <header className="flex justify-between items-center">
+        <div>
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-blue-600 bg-clip-text text-transparent">
+            Gateway Overview
+          </h2>
+          <p className="text-gray-400 mt-2 flex items-center gap-2">
+            <Activity size={16} /> Real-time System Telemetry
+          </p>
+        </div>
+        <div className="flex gap-4">
+          {/* Status Badge */}
+          <div className={clsx("px-4 py-2 rounded-full font-bold border",
+            data.status === 'up' ? "bg-green-500/10 border-green-500 text-green-500" : "bg-red-500/10 border-red-500 text-red-500"
+          )}>
+            SYSTEM {data.status.toUpperCase()}
+          </div>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <HealthCard
-          name="Qdrant"
-          status={backendStatus.qdrant ? getStatus(backendStatus.qdrant) : 'unknown'}
-          latency={backendStatus.qdrant === 'UP' ? 12 : undefined}
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard
+          title="Avg Latency"
+          value={`${data.metrics?.avg_latency_ms.toFixed(2) || 0}ms`}
+          icon={<Zap size={20} className="text-yellow-400" />}
+          trend="Real-time"
         />
-        <HealthCard
-          name="Milvus"
-          status={backendStatus.milvus ? getStatus(backendStatus.milvus) : 'unknown'}
-          latency={backendStatus.milvus === 'UP' ? 35 : undefined}
+        <MetricCard
+          title="Current RPS"
+          value={data.metrics?.current_rps.toFixed(1) || "0.0"}
+          icon={<Globe size={20} className="text-blue-400" />}
+          trend="Requests/sec"
         />
-        <HealthCard
-          name="Weaviate"
-          status={backendStatus.weaviate ? getStatus(backendStatus.weaviate) : 'unknown'}
-          latency={backendStatus.weaviate === 'UP' ? 28 : undefined}
+        <MetricCard
+          title="Total Requests"
+          value={data.metrics?.total_requests.toLocaleString() || "0"}
+          icon={<Server size={20} className="text-purple-400" />}
+        />
+        <MetricCard
+          title="Error Rate"
+          value={`${((data.metrics?.failed_requests || 0) / (data.metrics?.total_requests || 1) * 100).toFixed(2)}%`}
+          icon={<Activity size={20} className="text-red-400" />}
         />
       </div>
 
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <h3 className="text-xl font-semibold mb-4 text-white">Metrics</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <p className="text-sm text-gray-400">Total Requests</p>
-            <p className="text-2xl font-bold text-white">1,234</p>
+      {/* Backend Status & Charts Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        {/* Backend Status List */}
+        <div className="lg:col-span-1 bg-gray-900/50 border border-gray-800 rounded-2xl p-6 backdrop-blur-sm">
+          <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-white">
+            <Database size={20} /> Backend Services
+          </h3>
+          <div className="space-y-4">
+            {Object.entries(data.backend_status).map(([name, status]) => (
+              <div key={name} className="flex items-center justify-between p-4 bg-black/40 rounded-xl border border-gray-800">
+                <div className="flex items-center gap-3">
+                  <div className={clsx("w-3 h-3 rounded-full animate-pulse", status === 'UP' ? "bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.5)]" : "bg-red-500")} />
+                  <span className="capitalize font-medium text-gray-200">{name}</span>
+                </div>
+                <span className={clsx("text-xs font-bold px-2 py-1 rounded", status === 'UP' ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400")}>
+                  {status}
+                </span>
+              </div>
+            ))}
           </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <p className="text-sm text-gray-400">Cache Hit Rate</p>
-            <p className="text-2xl font-bold text-green-400">85%</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <p className="text-sm text-gray-400">Avg Latency</p>
-            <p className="text-2xl font-bold text-blue-400">32ms</p>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <p className="text-sm text-gray-400">System Status</p>
-            <p className="text-2xl font-bold text-white">{healthData?.status === 'ok' ? 'HEALTHY' : 'DEGRADED'}</p>
+        </div>
+
+        {/* Real-time Chart */}
+        <div className="lg:col-span-2 bg-gray-900/50 border border-gray-800 rounded-2xl p-6 backdrop-blur-sm min-h-[400px]">
+          <h3 className="text-xl font-semibold mb-6 flex items-center gap-2 text-white">
+            <Cpu size={20} /> Traffic & Latency
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={history}>
+                <defs>
+                  <linearGradient id="colorRps" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="time" stroke="#666" fontSize={12} tick={{ fill: '#666' }} />
+                <YAxis stroke="#666" fontSize={12} tick={{ fill: '#666' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#111', border: '1px solid #333' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Area type="monotone" dataKey="rps" stroke="#8884d8" fillOpacity={1} fill="url(#colorRps)" name="RPS" />
+                <Line type="monotone" dataKey="latency" stroke="#82ca9d" strokeWidth={2} dot={false} name="Latency (ms)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+function MetricCard({ title, value, icon, trend }: any) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-900/50 border border-gray-800 p-6 rounded-2xl backdrop-blur-sm hover:border-gray-700 transition-colors"
+    >
+      <div className="flex justify-between items-start mb-4">
+        <div className="p-3 bg-gray-800/50 rounded-xl">
+          {icon}
+        </div>
+        {trend && <span className="text-xs text-gray-500 font-mono">{trend}</span>}
+      </div>
+      <div>
+        <h4 className="text-gray-400 text-sm font-medium mb-1">{title}</h4>
+        <div className="text-3xl font-bold text-white tracking-tight">{value}</div>
+      </div>
+    </motion.div>
   );
 }

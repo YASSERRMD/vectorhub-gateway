@@ -86,6 +86,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080 # Browser-side access
+      - INTERNAL_API_URL=http://gateway:8080 # Server-side access (container-to-container)
     depends_on:
       - gateway
 
