@@ -1,4 +1,5 @@
 import ballerina/http;
+import ballerina/time;
 import vectorhub/gateway.config;
 import vectorhub/gateway.utils;
 import vectorhub/gateway.cache;
@@ -25,14 +26,13 @@ gateway:Router router = new(connPool, appConfig);
 gateway:Aggregator aggregator = new();
 gateway:Deduplicator deduplicator = new(redisCache);
 gateway:RateLimiter rateLimiter = new(redisCache, 100, 60); // Default limits
+gateway:MetricsService metricsService = new();
+gateway:MgmtService mgmtService = new(connPool, redisCache, metricsService, appConfig); 
 
 service http:Service / on new http:Listener(appConfig.gateway.port) {
 
     resource function get health() returns json {
-         return {
-            "status": "ok",
-            "backend_status": connPool.checkHealth()
-        };
+         return mgmtService.getHealth();
     }
 
     resource function get v1/ping() returns string {
@@ -40,8 +40,12 @@ service http:Service / on new http:Listener(appConfig.gateway.port) {
     }
 
     resource function post v1/search(http:Request req) returns http:Response|json|error {
+        metricsService.incrementRequest();
+        time:Utc startTime = time:utcNow();
+
         json|error payload = req.getJsonPayload();
         if payload is error {
+            metricsService.incrementFailure();
             return { "error": "Invalid JSON payload" };
         }
 
@@ -51,6 +55,7 @@ service http:Service / on new http:Listener(appConfig.gateway.port) {
             http:Response resp = new;
             resp.statusCode = 429;
             resp.setPayload({ "error": "Rate limit exceeded" });
+            metricsService.incrementFailure();
             return resp; // Return Response object directly
         }
 
@@ -110,6 +115,7 @@ service http:Service / on new http:Listener(appConfig.gateway.port) {
         if aggregated is json {
              // 6. Cache Result
              deduplicator.cacheResult(dedupKey, aggregated.toJsonString(), 60); 
+             metricsService.incrementSuccess(time:utcDiffSeconds(time:utcNow(), startTime));
              return aggregated;
         } else {
              utils:logError("Aggregation failed", aggregated);
