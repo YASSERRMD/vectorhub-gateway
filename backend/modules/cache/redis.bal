@@ -50,6 +50,21 @@ public class RedisCache {
              _ = check rClient->expire(key, ttlSeconds);
         }
     }
+
+    public function increment(string key, int ttlSeconds) returns int|error {
+        if !self.enabled {
+            return 0; // Allow if cache disabled
+        }
+        redis:Client? rClient = self.redisClient;
+        if rClient is redis:Client {
+             int val = check rClient->incr(key);
+             if val == 1 {
+                 _ = check rClient->expire(key, ttlSeconds);
+             }
+             return val;
+        }
+        return 0;
+    }
     
     public function isEnabled() returns boolean {
         return self.enabled;
