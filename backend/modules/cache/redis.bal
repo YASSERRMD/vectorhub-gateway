@@ -13,14 +13,11 @@ public class RedisCache {
             return;
         }
 
-        self.redisClient = check new (
-            connectionString = connectionUrl,
-            config = {
-                connectionPooling: true,
-                isClusterConnection: false,
-                ssl: false
-            }
-        );
+        self.redisClient = check new ({
+            connection: connectionUrl,
+            connectionPooling: true,
+            isClusterConnection: false
+        });
         self.enabled = true;
         utils:info("Redis cache initialized: " + connectionUrl);
     }
@@ -29,9 +26,9 @@ public class RedisCache {
         if !self.enabled {
             return ();
         }
-        redis:Client? client = self.redisClient;
-        if client is redis:Client {
-             var result = client->get(key);
+        redis:Client? rClient = self.redisClient;
+        if rClient is redis:Client {
+             var result = rClient->get(key);
              if result is string {
                  return result;
              } else if result is () {
@@ -47,10 +44,10 @@ public class RedisCache {
         if !self.enabled {
             return;
         }
-        redis:Client? client = self.redisClient;
-        if client is redis:Client {
-             _ = check client->set(key, value);
-             _ = check client->expire(key, ttlSeconds);
+        redis:Client? rClient = self.redisClient;
+        if rClient is redis:Client {
+             _ = check rClient->set(key, value);
+             _ = check rClient->expire(key, ttlSeconds);
         }
     }
     

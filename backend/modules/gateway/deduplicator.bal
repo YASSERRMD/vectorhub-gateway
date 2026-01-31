@@ -16,8 +16,9 @@ public class Deduplicator {
     }
 
     public function getCachedResult(string key) returns string? {
-        if self.cache is cache:RedisCache {
-            var result = self.cache.get(key);
+        cache:RedisCache? rCache = self.cache;
+        if rCache is cache:RedisCache {
+            var result = rCache.get(key);
             if result is string {
                 utils:info("Cache hit for key: " + key);
                 return result;
@@ -27,8 +28,9 @@ public class Deduplicator {
     }
 
     public function cacheResult(string key, string value, int ttl) {
-        if self.cache is cache:RedisCache {
-            error? err = self.cache.set(key, value, ttl);
+        cache:RedisCache? rCache = self.cache;
+        if rCache is cache:RedisCache {
+            error? err = rCache.set(key, value, ttl);
             if err is error {
                 utils:logError("Failed to cache result", err);
             }
