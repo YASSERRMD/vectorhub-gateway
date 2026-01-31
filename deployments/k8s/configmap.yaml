@@ -1,0 +1,60 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: vectorhub
+data:
+  Config.toml: |
+    [gateway]
+    port = 8080
+    workers = 10
+    maxConnections = 100
+    requestTimeoutMs = 5000
+    enableCompression = false
+
+    [gateway.routing]
+    strategy = "round-robin"
+    enableFallback = true
+    maxConcurrentBackends = 3
+
+    [backend.connection]
+    timeout = 2000
+    poolSize = 10
+
+    [backends.qdrant]
+    urls = ["http://qdrant:6333"]
+    weight = 1
+
+    [backends.qdrant.circuitBreaker]
+    failureThreshold = 0.5
+    resetTimeMs = 10000
+    timeWindowMs = 60000
+    minRequestVolume = 5
+
+    [backends.milvus]
+    urls = ["http://milvus:19530"]
+    weight = 1
+
+    [backends.milvus.circuitBreaker]
+    failureThreshold = 0.5
+    resetTimeMs = 10000
+    timeWindowMs = 60000
+    minRequestVolume = 5
+
+    [backends.weaviate]
+    urls = ["http://weaviate:8080"]
+    weight = 1
+
+    [backends.weaviate.circuitBreaker]
+    failureThreshold = 0.5
+    resetTimeMs = 10000
+    timeWindowMs = 60000
+    minRequestVolume = 5
+
+    [observability]
+    metricsEnabled = true
+    metricsPort = 9797
+    tracingEnabled = true
+    tracingEndpoint = "http://jaeger:14268/api/traces"
+    logLevel = "INFO"
+    structuredLogs = true
