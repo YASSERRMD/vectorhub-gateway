@@ -1,11 +1,16 @@
 import vectorhub/gateway.clients;
 import vectorhub/gateway.config;
 import vectorhub/gateway.utils;
+import vectorhub/gateway.circuit;
 
 public class ConnectionPool {
     clients:QdrantClient qdrantClient;
     clients:MilvusClient milvusClient;
     clients:WeaviateClient weaviateClient;
+    
+    public circuit:CircuitBreaker qdrantCb;
+    public circuit:CircuitBreaker milvusCb;
+    public circuit:CircuitBreaker weaviateCb;
     
     config:AppConfig appConfig;
 
@@ -24,7 +29,12 @@ public class ConnectionPool {
         self.milvusClient = check new clients:MilvusClient(milvusUrl);
         self.weaviateClient = check new clients:WeaviateClient(weaviateUrl);
         
-        utils:info("Connection pool initialized");
+        // Initialize Circuit Breakers
+        self.qdrantCb = new("qdrant", config.backends.qdrant.circuitBreaker);
+        self.milvusCb = new("milvus", config.backends.milvus.circuitBreaker);
+        self.weaviateCb = new("weaviate", config.backends.weaviate.circuitBreaker);
+        
+        utils:info("Connection pool initialized with circuit breakers");
     }
 
     public function getQdrantClient() returns clients:QdrantClient {
