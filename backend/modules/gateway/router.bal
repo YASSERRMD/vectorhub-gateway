@@ -1,6 +1,6 @@
 import vectorhub/gateway.config;
 import vectorhub/gateway.pool;
-import vectorhub/gateway.circuit;
+// import vectorhub/gateway.circuit; // Unused, accessed via pool
 import vectorhub/gateway.utils;
 
 public class Router {
