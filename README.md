@@ -3,46 +3,46 @@
   
   # VectorHub Gateway
   
-  **🚀 High-Performance Unified API Gateway for Vector Databases**
+  **High-Performance Unified API Gateway for Vector Databases**
   
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
   [![Ballerina](https://img.shields.io/badge/Built%20with-Ballerina-1E88E5.svg)](https://ballerina.io)
   [![Next.js](https://img.shields.io/badge/Dashboard-Next.js%2016-000000.svg)](https://nextjs.org)
   [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://docker.com)
   
-  [Features](#-features) • [Quick Start](#-quick-start) • [API Reference](#-api-reference) • [Architecture](#-architecture) • [Deployment](#-deployment)
+  [Features](#features) • [Quick Start](#quick-start) • [API Reference](#api-reference) • [Architecture](#architecture) • [Deployment](#deployment)
 </div>
 
 ---
 
-## 🎯 Overview
+## Overview
 
 VectorHub Gateway is a cloud-native API gateway that provides a **unified interface** to query and manage multiple vector databases. Built with [Ballerina](https://ballerina.io) for high-performance backend processing and [Next.js](https://nextjs.org) for a real-time monitoring dashboard.
 
 **Supported Vector Databases:**
-- 🔶 **Qdrant** - High-performance vector search
-- 🔷 **Milvus** - Purpose-built for scalable similarity search  
-- 🟢 **Weaviate** - AI-native vector database
+- **Qdrant** - High-performance vector search
+- **Milvus** - Purpose-built for scalable similarity search  
+- **Weaviate** - AI-native vector database
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
-| **🔀 Unified API** | Single `/v1/search` endpoint to query all vector databases |
-| **🧠 Intelligent Routing** | Automatic routing based on latency, availability, or round-robin |
-| **⚡ Circuit Breaker** | Automatic detection and isolation of failing backends |
-| **💾 Redis Caching** | High-speed caching with request deduplication |
-| **🚦 Rate Limiting** | Token-bucket algorithm for resource protection |
-| **🔄 Scatter-Gather** | Parallel queries with intelligent result aggregation |
-| **📊 Real-time Dashboard** | Live metrics, health status, and traffic visualization |
-| **🔍 Observability** | Jaeger tracing and Prometheus metrics built-in |
-| **🔒 CORS Support** | Full CORS headers for cross-origin requests |
+| **Unified API** | Single `/v1/search` endpoint to query all vector databases |
+| **Intelligent Routing** | Automatic routing based on latency, availability, or round-robin |
+| **Circuit Breaker** | Automatic detection and isolation of failing backends |
+| **Redis Caching** | High-speed caching with request deduplication |
+| **Rate Limiting** | Token-bucket algorithm for resource protection |
+| **Scatter-Gather** | Parallel queries with intelligent result aggregation |
+| **Real-time Dashboard** | Live metrics, health status, and traffic visualization |
+| **Observability** | Jaeger tracing and Prometheus metrics built-in |
+| **CORS Support** | Full CORS headers for cross-origin requests |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -73,7 +73,7 @@ docker-compose -f deployments/docker-compose.yml up -d
 
 ---
 
-## 📖 API Reference
+## API Reference
 
 ### Health Check
 ```http
@@ -137,7 +137,7 @@ Returns: `pong`
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -164,7 +164,7 @@ Returns: `pong`
 
 ---
 
-## 🛠 Development
+## Development
 
 ### Backend Development
 ```bash
@@ -203,7 +203,7 @@ weight = 1
 
 ---
 
-## ☸️ Deployment
+## Deployment
 
 ### Docker Compose (Recommended)
 ```bash
@@ -225,7 +225,7 @@ kubectl apply -f deployments/k8s/
 
 ---
 
-## 📊 Monitoring
+## Monitoring
 
 The dashboard provides real-time visualization of:
 - **System Status** - Overall gateway health
@@ -237,7 +237,7 @@ Access the dashboard at: **http://localhost:3000**
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -249,12 +249,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
-  <sub>Built with ❤️ using Ballerina & Next.js</sub>
+  <sub>Built with Ballerina & Next.js</sub>
 </div>
