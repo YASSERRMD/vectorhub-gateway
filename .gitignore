@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+target/
+dist/
+build/
+*.jar
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Ballerina
+backend/target/
+backend/Dependencies.toml
